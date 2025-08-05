@@ -76,23 +76,31 @@ const int TIMER_INTERVAL_MS = 20; // ~50fps
  */
 void Draw_Waveform(HDC hdc, const RECT& rect, size_t offset, size_t visible_len)
 {
-	MoveToEx(hdc, rect.left, rect.top + (rect.bottom - rect.top) / 2, nullptr);
-
 	size_t sample_size = waveforge.Get_Sample_Size();
-	if (sample_size == 0) return;
+	if (sample_size == 0 || offset >= sample_size) return;
 
 	int mid_y = rect.top + (rect.bottom - rect.top) / 2;
+	int height = rect.bottom - rect.top;
+	int width = rect.right - rect.left;
 
-	for (size_t x = 0; x < rect.right - rect.left && x < visible_len; ++x)
+	// Step 1: Find peak amplitude in visible range
+	int16_t max_sample = 1; // Avoid divide by zero
+	size_t end = min(offset + visible_len, sample_size);
+	for (size_t i = offset; i < end; ++i)
 	{
-		size_t index = offset + x;
-		if (index >= sample_size) break;
+		int16_t sample = waveforge.Get_Sample(i);
+		max_sample = std::max<int16_t>(max_sample, std::abs(sample));
+	}
 
-		int16_t sample = waveforge.Get_Sample(index);
-		int y = mid_y - (sample * (rect.bottom - rect.top) / 2) / waveforge.Get_Amplitude();
+	// Step 2: Draw waveform
+	MoveToEx(hdc, rect.left, mid_y, nullptr);
+	for (size_t x = 0; x < width && offset + x < end; ++x)
+	{
+		int16_t sample = waveforge.Get_Sample(offset + x);
+		int y = mid_y - (sample * (height / 2)) / max_sample;
 		LineTo(hdc, rect.left + x, y);
 	}
-} // end Draw_Wave_Form
+}
 
 
 //========================================================================|
